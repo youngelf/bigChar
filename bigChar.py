@@ -30,18 +30,17 @@ from gi.repository import Gst, Gtk, Pango, Gdk, GObject
 class AudioPlayer():
     """ A class that plays OGG Vorbis files. """
     def __init__(self):
+        """ Initialize the Audio Player and set up Gstreamer """
         self.started = False
         # Change this location to indicate where the songs are stored.
         self.music_path = os.path.dirname(os.path.realpath(__file__)) + "/music/"
         print self.music_path
 
-    def start(self, alphabet):
-        """Starts playing music for the alphabet indicated."""
-        if (self.started):
-            self.pipeline.set_state(Gst.State.NULL)
+        Gst.init(None)
+        # Create a pipeline
         self.pipeline = Gst.Pipeline.new("pipe")
 
-        source = Gst.ElementFactory.make('filesrc')
+        self.source = Gst.ElementFactory.make('filesrc')
         demux = Gst.ElementFactory.make('oggdemux')
         # The demux does not expose any pads till it has a file. Attach
         # a callback when pads are added
@@ -51,7 +50,7 @@ class AudioPlayer():
         sink = Gst.ElementFactory.make('autoaudiosink')
 
         # Attach all the elements to the pipeline
-        self.pipeline.add(source)
+        self.pipeline.add(self.source)
         self.pipeline.add(demux)
         self.pipeline.add(self.decoder)
         self.pipeline.add(converter)
@@ -59,7 +58,7 @@ class AudioPlayer():
 
         # Attach source -> demux & decoder  -> converter -> sink
         # demux -> decoder is done in the demuxer_callback
-        source.link(demux)
+        self.source.link(demux)
         self.decoder.link(converter)
         converter.link(sink)
 
@@ -68,12 +67,21 @@ class AudioPlayer():
         bus.add_signal_watch()
         bus.connect("message", self.on_message)
 
+    def start(self, alphabet):
+        """Starts playing music for the alphabet indicated.
+
+        The alphabet is currently upper case, so your music files have
+        to be X.ogg, Y.ogg, etc.
+        """
+        if (self.started):
+            self.pipeline.set_state(Gst.State.NULL)
+
         # Specify <current_dir>/music/S.ogg as the file to play when
         # the letter 's' or 'S' is pressed.
         filename = self.music_path + ("%s.ogg" % alphabet)
 
         # Set this as the source filename
-        source.set_property("location", filename)
+        self.source.set_property("location", filename)
 
         # Start playing the pipeline
         self.pipeline.set_state(Gst.State.PLAYING)
@@ -240,7 +248,7 @@ class BigChar():
         self.set_time()
 
         # Make the text view take the entire window
-        vbox = Gtk.VBox(homogeneous=False, spacing=0)
+        vbox = Gtk.VBox(homogeneous=True, spacing=0)
         color = Gdk.Color.parse(background_color)[1]
 
         self.w.modify_bg(Gtk.StateType.NORMAL, color)
@@ -248,7 +256,7 @@ class BigChar():
         textView.modify_bg(Gtk.StateType.NORMAL, color)
 
         vbox.pack_start(textView, fill=True, expand=False, padding=0)
-        vbox.pack_start(self.progress, fill=True, expand=True, padding=0)
+        vbox.pack_start(self.progress, fill=False, expand=False, padding=0)
 
         self.w.add(vbox)
 
@@ -262,5 +270,4 @@ if __name__ == '__main__':
     bigchar = BigChar()
     bigchar.show()
     GObject.threads_init()
-    Gst.init(None)
     Gtk.main()
